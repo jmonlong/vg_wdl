@@ -15,7 +15,6 @@ workflow vgMapCallSV {
         File GCSA_FILE                          # Path to .gcsa index file
         File GCSA_LCP_FILE                      # Path to .gcsa.lcp index file
         File? GBWT_FILE                         # (OPTIONAL) Path to .gbwt index file
-        File? PATH_LIST_FILE                    # (OPTIONAL) Text file where each line is a path name in the XG index
         Int READS_PER_CHUNK = 20000000          # Number of reads contained in each mapping chunk (20000000 for wgs).
         Int SPLIT_READ_CORES = 32
         Int SPLIT_READ_DISK = 200
@@ -52,16 +51,6 @@ workflow vgMapCallSV {
         in_split_read_cores=SPLIT_READ_CORES,
         in_split_read_disk=SPLIT_READ_DISK
     }
-    
-    # Extract path names and path lengths from xg file if PATH_LIST_FILE input not provided
-    if (!defined(PATH_LIST_FILE)) {
-        call extractPathNames {
-            input:
-            in_xg_file=XG_FILE,
-            in_vg_container=VG_CONTAINER
-        }
-    }
-    File pipeline_path_list_file = select_first([PATH_LIST_FILE, extractPathNames.output_path_list])
     
     ################################################################
     # Distribute vg mapping opperation over each chunked read pair #
@@ -232,29 +221,6 @@ task splitReads {
         cpu: in_split_read_cores
         memory: "40 GB"
         disks: "local-disk " + in_split_read_disk + " SSD"
-        docker: in_vg_container
-    }
-}
-
-task extractPathNames {
-    input {
-        File in_xg_file
-        String in_vg_container
-    }
-
-    command {
-        set -eux -o pipefail
-
-        vg paths \
-            --list \
-            --xg ${in_xg_file} > path_list.txt
-    }
-    output {
-        File output_path_list = "path_list.txt"
-    }
-    runtime {
-        memory: "20 GB"
-        disks: "local-disk 50 SSD"
         docker: in_vg_container
     }
 }
